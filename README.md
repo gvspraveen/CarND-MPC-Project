@@ -1,7 +1,75 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
 
----
+## Description of Implementation
+
+In this repository I implemented a Model Predictive Controller (MPC) to drive car around
+track in udacity provided simulator. Here, I will explain my implementation details following the guidelines
+from [rubric](https://review.udacity.com/#!/rubrics/896/view)
+
+### Model Description
+In this repository I used Kinematic model described in lecture videos. Model takes into account position of the car,
+heading direciton, velocity, cross track error and orientation error. Dynamic features like friction etc are not considered.
+
+Model takes into account current state and computes actuataions (steering and throttle). At the next time step it
+again takes state and actuations issued in previous state. Actuations from previous state help determine predicted
+state at current step. Model progressively issues new acutaitons based on error.
+
+Following equations describe the vehicle model mathematically.
+
+- `x, y` => vehicle coordinates
+- `psi` => heading of the car
+- `v` => velocity of the car
+- `cte` => cross track error
+- `epsi` => orientation error
+- `Lf` => Distance between center of car to the front of car
+- `dt` => time delta
+- `delta` => throttle/accleration
+
+```
+ x_t1 = x_t0 + v_t0 * cos(psi_t0) * dt
+ y_t1 = y_t0 + v_t0 * sin(psi_t0) * dt
+ psi_t1 = psi_t0 + v_t0 / Lf * delta_t0 * dt
+ v_t1 = v_t0 + a_t0 * dt
+ cte_t1 = f(x_t0) - y_t0 + v_t0 * sin(epsi_t0) * dt
+ epsi_t1 = psi_t0 - psides_t0 + v_t0 * delta_t0 / Lf * dt
+
+```
+
+### Reasoning behind the chosen N (timestep length) and dt (elapsed duration between timesteps) values
+My final values chosen are `N=12` and `dt=0.05`.  I tried various combinations for N ranging from 8-14 and dt from 0.1 to 0.01. I found this combination
+to be most optimal for driving the car around the track at 40-45mph speed. Lower time horizons (t=N*dt) tend to run the car off track while higher values
+cause too many oscillations. Also I tuned ref velocity to be around 40-45. At higher speeds on my computer, whatever values of N and dt I chose, tend to either cause
+too many oscillations of take care off the track
+
+### Polynomial Fitting and MPC Preprocessing
+
+Simulator already gives us way points. However, I need to transform them in to vehicle coordinate system.
+This means that the position of the vehicle state provided to solver has (0,0) as coordinates and heading as 0. Equations for transformation can be simply
+expressed as:
+
+```
+dx = x_waypoint - px;
+dy = y_waypoint - py;
+x_waypoint_vehicle_space = dx * cos(psi) + dy * sin(psi);
+y_waypoint_vehicle_space = - dx * sin(psi) + dy * cos(psi);
+
+```
+
+### Model Predictive Control with Latency
+
+As required by project, this code implements Model Predictive Control that handles a 100 millisecond latency.
+
+This was achieved by taking into consideration latency while setting constraints. During constraint setting, we penalize
+the difference between predicted state and actual state. Predicted state at time step t1 is computed by applying kinematic equations on state at time step t0.
+However, since actuations are exectued by car with latency of 100ms, we need to be careful in selecting acceleration and throttle at time t0 for prediction purpose.
+We need to instead select actuations from t0-100ms.
+
+In case of my parameters, since `dt = 0.05` (=50ms), that is two time steps behind t0. I use this in the code, in `MCP.cpp` @line#105.
+
+
+
+--------------------------------------------------------------------------------------------------
 
 ## Dependencies
 
