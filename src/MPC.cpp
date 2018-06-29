@@ -35,7 +35,7 @@ size_t cte_start = v_start + N;
 size_t epsi_start = cte_start + N;
 size_t delta_start = epsi_start + N;
 size_t a_start = delta_start + N - 1;
-double ref_v = 70;
+double ref_v = 35;
 
 
 class FG_eval {
@@ -51,6 +51,8 @@ class FG_eval {
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
 
+    // cout << "operator() initiated" << endl;
+
     fg[0] = 0;
 
     // State cost
@@ -58,7 +60,7 @@ class FG_eval {
       // trajectory
       fg[0] += CppAD::pow(vars[cte_start + i], 2);
       fg[0] += CppAD::pow(vars[epsi_start + i], 2);
-      fg[0] += CppAD::pow(vars[v_start + i], 2);
+      fg[0] += CppAD::pow(vars[v_start + i] - ref_v, 2);
     }
 
     // Add cost for too much steering and acceleration.
@@ -74,6 +76,8 @@ class FG_eval {
       fg[0] += 10*CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
     }
 
+    // cout << "fg[0] Cost has been set" << endl;
+
     // Setting up constraints
     // This is similar to lecture videos. Since fg holds cost at 0th index, constraints start from index 1
     fg[1 + x_start] = vars[x_start];
@@ -82,6 +86,8 @@ class FG_eval {
     fg[1 + v_start] = vars[v_start];
     fg[1 + cte_start] = vars[cte_start];
     fg[1 + epsi_start] = vars[epsi_start];
+
+    // cout << "fg Set up start params" << endl;
 
     // The rest of the constraints
     for (int i = 0; i < N - 1; i++) {
@@ -119,10 +125,11 @@ class FG_eval {
       fg[2 + psi_start + i] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
       fg[2 + v_start + i] = v1 - (v0 + a0 * dt);
       fg[2 + cte_start + i] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
-      fg[2 + epsi_start + i] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
+      fg[2 + epsi_start + i] = epsi1 - ((psi0 - psides0) - v0/Lf * delta0 * dt);
 
     }
 
+    // cout << "End of all fg constraints" << endl;
   }
 };
 
@@ -146,6 +153,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // TODO: Set the number of constraints
   size_t n_constraints = N * 6;
 
+  // cout << "Vars and constraints sizes set" << endl;
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
 
@@ -211,9 +219,11 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   constraints_upperbound[cte_start] = cte;
   constraints_upperbound[epsi_start] = epsi;
 
+  // cout << "Done setting all constraints" << endl;
+
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
-
+  // cout << "FG_eval initalized" << endl;
   //
   // NOTE: You don't have to worry about these options
   //
@@ -259,9 +269,11 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   result_state.push_back(solution.x[delta_start]);
   result_state.push_back(solution.x[a_start]);
 
-  for ( int i = 0; i < N - 2; i++ ) {
-    result_state.push_back(solution.x[x_start + i + 1]);
-    result_state.push_back(solution.x[y_start + i + 1]);
+  for ( int i = 0; i < N - 1; i++ ) {
+    result_state.push_back(solution.x[x_start + i]);
+    result_state.push_back(solution.x[y_start + i]);
   }
+  std::cout << "Result state Computed" << endl;
+
   return result_state;
 }
